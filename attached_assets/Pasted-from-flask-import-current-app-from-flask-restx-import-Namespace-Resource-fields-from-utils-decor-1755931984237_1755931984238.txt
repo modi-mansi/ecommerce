@@ -1,0 +1,205 @@
+from flask import current_app
+from flask_restx import Namespace, Resource, fields
+from utils.decorators import handle_exceptions
+from app import db
+import logging
+
+logger = logging.getLogger(__name__)
+
+# Create namespace
+health_ns = Namespace('health', description='Health and monitoring endpoints')
+
+# Define models for Swagger documentation
+health_model = health_ns.model('Health', {
+    'status': fields.String(description='Overall health status'),
+    'timestamp': fields.String(description='Health check timestamp'),
+    'version': fields.String(description='Application version'),
+    'uptime': fields.Float(description='Application uptime in seconds')
+})
+
+database_health_model = health_ns.model('DatabaseHealth', {
+    'database': fields.String(description='Database connection status'),
+    'response_time_ms': fields.Float(description='Database response time in milliseconds')
+})
+
+event_bus_stats_model = health_ns.model('EventBusStats', {
+    'running': fields.Boolean(description='Event bus running status'),
+    'queue_size': fields.Integer(description='Pending events in queue'),
+    'subscriber_count': fields.Integer(description='Total number of subscribers'),
+    'event_types': fields.List(fields.String, description='Registered event types')
+})
+
+readiness_model = health_ns.model('Readiness', {
+    'ready': fields.Boolean(description='Application readiness status'),
+    'checks': fields.Raw(description='Individual readiness checks')
+})
+
+import time
+app_start_time = time.time()
+
+@health_ns.route('/live')
+class LivenessProbe(Resource):
+    @health_ns.doc('liveness_check')
+    @health_ns.marshal_with(health_model)
+    @handle_exceptions
+    def get(self):
+        """Liveness probe - checks if application is running"""
+        uptime = time.time() - app_start_time
+        
+        return {
+            'status': 'alive',
+            'timestamp': time.strftime('%Y-%m-%d %H:%M:%S UTC', time.gmtime()),
+            'version': '1.0.0',
+            'uptime': uptime
+        }
+
+@health_ns.route('/ready')
+class ReadinessProbe(Resource):
+    @health_ns.doc('readiness_check')
+    @health_ns.marshal_with(readiness_model)
+    @handle_exceptions
+    def get(self):
+        """Readiness probe - checks if application is ready to serve traffic"""
+        checks = {}
+        ready = True
+        
+        # Database check
+        try:
+            start_time = time.time()
+            db.session.execute(db.text('SELECT 1'))
+            response_time = (time.time() - start_time) * 1000
+            checks['database'] = {
+                'status': 'healthy',
+                'response_time_ms': response_time
+            }
+        except Exception as e:
+            checks['database'] = {
+                'status': 'unhealthy',
+                'error': str(e)
+            }
+            ready = False
+        
+        # Event bus check
+        try:
+            event_bus = current_app.config.get('EVENT_BUS')
+            if event_bus:
+                stats = event_bus.get_stats()
+                checks['event_bus'] = {
+                    'status': 'healthy' if stats['running'] else 'unhealthy',
+                    'stats': stats
+                }
+                if not stats['running']:
+                    ready = False
+            else:
+                checks['event_bus'] = {
+                    'status': 'unhealthy',
+                    'error': 'Event bus not configured'
+                }
+                ready = False
+        except Exception as e:
+            checks['event_bus'] = {
+                'status': 'unhealthy',
+                'error': str(e)
+            }
+            ready = False
+        
+        return {
+            'ready': ready,
+            'checks': checks
+        }
+
+@health_ns.route('/database')
+class DatabaseHealth(Resource):
+    @health_ns.doc('database_health')
+    @health_ns.marshal_with(database_health_model)
+    @handle_exceptions
+    def get(self):
+        """Database health check"""
+        try:
+            start_time = time.time()
+            
+            # Simple query to check database connectivity
+            db.session.execute(db.text('SELECT 1'))
+            
+            # Check if we can query actual tables
+            db.session.execute(db.text('SELECT COUNT(*) FROM products'))
+            
+            response_time = (time.time() - start_time) * 1000
+            
+            return {
+                'database': 'healthy',
+                'response_time_ms': response_time
+            }
+        except Exception as e:
+            logger.error(f"Database health check failed: {str(e)}")
+            return {
+                'database': 'unhealthy',
+                'error': str(e),
+                'response_time_ms': -1
+            }, 503
+
+@health_ns.route('/event-bus')
+class EventBusHealth(Resource):
+    @health_ns.doc('event_bus_health')
+    @health_ns.marshal_with(event_bus_stats_model)
+    @handle_exceptions
+    def get(self):
+        """Event bus health and statistics"""
+        try:
+            event_bus = current_app.config.get('EVENT_BUS')
+            if not event_bus:
+                return {'error': 'Event bus not configured'}, 503
+            
+            stats = event_bus.get_stats()
+            return stats
+        except Exception as e:
+            logger.error(f"Event bus health check failed: {str(e)}")
+            return {'error': str(e)}, 503
+
+@health_ns.route('/metrics')
+class Metrics(Resource):
+    @health_ns.doc('get_metrics')
+    @handle_exceptions
+    def get(self):
+        """Application metrics"""
+        try:
+            from models import Order, Product, Payment, Notification, OrderStatus, PaymentStatus
+            
+            metrics = {
+                'orders': {
+                    'total': Order.query.count(),
+                    'pending': Order.query.filter(Order.status == OrderStatus.PENDING).count(),
+                    'completed': Order.query.filter(Order.status == OrderStatus.COMPLETED).count(),
+                    'cancelled': Order.query.filter(Order.status == OrderStatus.CANCELLED).count()
+                },
+                'products': {
+                    'total': Product.query.count(),
+                    'low_stock': Product.query.filter(Product.stock_quantity <= 10).count(),
+                    'out_of_stock': Product.query.filter(Product.stock_quantity <= 0).count()
+                },
+                'payments': {
+                    'total': Payment.query.count(),
+                    'completed': Payment.query.filter(Payment.status == PaymentStatus.COMPLETED).count(),
+                    'failed': Payment.query.filter(Payment.status == PaymentStatus.FAILED).count()
+                },
+                'notifications': {
+                    'total': Notification.query.count(),
+                    'sent': Notification.query.filter(Notification.status == 'sent').count(),
+                    'failed': Notification.query.filter(Notification.status == 'failed').count()
+                },
+                'system': {
+                    'uptime': time.time() - app_start_time,
+                    'version': '1.0.0',
+                    'timestamp': time.strftime('%Y-%m-%d %H:%M:%S UTC', time.gmtime())
+                }
+            }
+            
+            # Event bus metrics
+            event_bus = current_app.config.get('EVENT_BUS')
+            if event_bus:
+                metrics['event_bus'] = event_bus.get_stats()
+            
+            return metrics
+        except Exception as e:
+            logger.error(f"Error getting metrics: {str(e)}")
+            return {'error': str(e)}, 500

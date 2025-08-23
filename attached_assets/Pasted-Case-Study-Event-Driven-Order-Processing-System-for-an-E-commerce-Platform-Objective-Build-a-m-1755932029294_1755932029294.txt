@@ -1,0 +1,64 @@
+Case Study: Event-Driven Order Processing System for an E-commerce Platform
+🎯 Objective
+Build a modular Flask-based microservice that handles order placement, inventory management, and payment processing using an event-driven architecture with message queues.
+---
+🧱 Tech Stack
+· Backend Framework: Flask
+· Database: PostgreSQL (SQLAlchemy ORM)
+· Message Broker: RabbitMQ or Apache Kafka
+· Task Queue: Celery
+· Authentication: JWT
+· Containerization: Docker
+· Monitoring: Prometheus + Grafana
+· Deployment: Kubernetes (optional for scaling)
+---
+🔧 Key Microservices
+1. Order Service
+· Accepts new orders via REST API
+· Publishes order_created event to message broker
+2. Inventory Service
+· Listens for order_created events
+· Checks and updates stock levels
+· Publishes inventory_updated or inventory_failed
+3. Payment Service
+· Listens for inventory_updated events
+· Processes payment (mocked)
+· Publishes payment_successful or payment_failed
+4. Notification Service
+· Listens for all events
+· Sends email/SMS notifications (mocked)
+---
+🧠 Advanced Concepts to Showcase
+· Event-driven architecture with Flask and RabbitMQ/Kafka
+· Blueprints and application factory pattern in Flask
+· Custom decorators for logging, error handling, and auth
+· Celery workers for async processing
+· Retry logic and dead-letter queues
+· Unit tests with pytest and unittest.mock
+· Structured logging with loguru or structlog
+· Health checks and readiness probes for Kubernetes
+---
+📁 Suggested Project Structure
+ecommerce_platform/
+├── order_service/
+│ ├── app.py
+│ ├── routes/
+│ ├── models/
+│ ├── events/
+│ └── utils/
+├── inventory_service/
+├── payment_service/
+├── notification_service/
+├── shared/
+│ ├── config/
+│ └── messaging/
+├── docker-compose.yml
+├── requirements.txt
+└── README.md
+---
+📈 Bonus Enhancements
+· Swagger UI with Flask-RESTX
+· Circuit breaker pattern using pybreaker
+· Distributed tracing with OpenTelemetry
+· Role-based access control (RBAC)
+· Integration with Stripe or Razorpay for real payments

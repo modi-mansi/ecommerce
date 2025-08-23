@@ -1,0 +1,184 @@
+from flask import request
+from flask_restx import Namespace, Resource, fields
+from services.order_service import OrderService
+from utils.decorators import handle_exceptions
+import logging
+
+logger = logging.getLogger(__name__)
+
+# Create namespace
+order_ns = Namespace('orders', description='Order management operations')
+
+# Define models for Swagger documentation
+order_item_model = order_ns.model('OrderItem', {
+    'sku': fields.String(required=True, description='Product SKU'),
+    'name': fields.String(required=True, description='Product name'),
+    'price': fields.Float(required=True, description='Unit price'),
+    'quantity': fields.Integer(required=True, description='Quantity ordered')
+})
+
+create_order_model = order_ns.model('CreateOrder', {
+    'customer_name': fields.String(required=True, description='Customer full name'),
+    'customer_email': fields.String(required=True, description='Customer email address'),
+    'items': fields.List(fields.Nested(order_item_model), required=True, description='Order items'),
+    'shipping_address': fields.String(description='Shipping address')
+})
+
+order_response_model = order_ns.model('OrderResponse', {
+    'id': fields.Integer(description='Order ID'),
+    'order_number': fields.String(description='Unique order number'),
+    'customer_name': fields.String(description='Customer name'),
+    'customer_email': fields.String(description='Customer email'),
+    'status': fields.String(description='Order status'),
+    'total_amount': fields.Float(description='Total order amount'),
+    'items': fields.List(fields.Nested(order_item_model), description='Order items'),
+    'shipping_address': fields.String(description='Shipping address'),
+    'created_at': fields.String(description='Order creation timestamp'),
+    'updated_at': fields.String(description='Last update timestamp')
+})
+
+error_model = order_ns.model('Error', {
+    'error': fields.String(description='Error message'),
+    'details': fields.String(description='Error details')
+})
+
+# Initialize service
+order_service = OrderService()
+
+@order_ns.route('/')
+class OrderList(Resource):
+    @order_ns.doc('list_orders')
+    @order_ns.marshal_list_with(order_response_model)
+    @handle_exceptions
+    def get(self):
+        """Get all orders"""
+        orders = order_service.get_all_orders()
+        return [order.to_dict() for order in orders]
+    
+    @order_ns.doc('create_order')
+    @order_ns.expect(create_order_model)
+    @order_ns.marshal_with(order_response_model, code=201)
+    @order_ns.response(400, 'Invalid input', error_model)
+    @handle_exceptions
+    def post(self):
+        """Create a new order"""
+        data = request.get_json()
+        
+        # Validate required fields
+        required_fields = ['customer_name', 'customer_email', 'items']
+        for field in required_fields:
+            if field not in data:
+                return {'error': f'Missing required field: {field}'}, 400
+        
+        # Validate items
+        if not data['items']:
+            return {'error': 'Order must contain at least one item'}, 400
+        
+        for item in data['items']:
+            required_item_fields = ['sku', 'name', 'price', 'quantity']
+            for field in required_item_fields:
+                if field not in item:
+                    return {'error': f'Missing required item field: {field}'}, 400
+        
+        order = order_service.create_order(data)
+        return order.to_dict(), 201
+
+@order_ns.route('/<int:order_id>')
+class Order(Resource):
+    @order_ns.doc('get_order')
+    @order_ns.marshal_with(order_response_model)
+    @order_ns.response(404, 'Order not found', error_model)
+    @handle_exceptions
+    def get(self, order_id):
+        """Get order by ID"""
+        order = order_service.get_order(order_id)
+        if not order:
+            return {'error': 'Order not found'}, 404
+        return order.to_dict()
+
+@order_ns.route('/<int:order_id>/status')
+class OrderStatus(Resource):
+    @order_ns.doc('update_order_status')
+    @order_ns.expect(order_ns.model('UpdateStatus', {
+        'status': fields.String(required=True, description='New order status'),
+        'reason': fields.String(description='Reason for status change')
+    }))
+    @order_ns.marshal_with(order_response_model)
+    @order_ns.response(404, 'Order not found', error_model)
+    @order_ns.response(400, 'Invalid status', error_model)
+    @handle_exceptions
+    def put(self, order_id):
+        """Update order status"""
+        data = request.get_json()
+        
+        if 'status' not in data:
+            return {'error': 'Status is required'}, 400
+        
+        try:
+            order = order_service.update_order_status(
+                order_id, 
+                data['status'], 
+                data.get('reason')
+            )
+            return order.to_dict()
+        except ValueError as e:
+            return {'error': str(e)}, 404
+        except Exception as e:
+            return {'error': f'Invalid status: {str(e)}'}, 400
+
+@order_ns.route('/<int:order_id>/cancel')
+class OrderCancel(Resource):
+    @order_ns.doc('cancel_order')
+    @order_ns.expect(order_ns.model('CancelOrder', {
+        'reason': fields.String(description='Reason for cancellation')
+    }))
+    @order_ns.marshal_with(order_response_model)
+    @order_ns.response(404, 'Order not found', error_model)
+    @order_ns.response(400, 'Cannot cancel order', error_model)
+    @handle_exceptions
+    def post(self, order_id):
+        """Cancel an order"""
+        data = request.get_json() or {}
+        reason = data.get('reason', 'Customer request')
+        
+        try:
+            order = order_service.cancel_order(order_id, reason)
+            return order.to_dict()
+        except ValueError as e:
+            return {'error': str(e)}, 400
+
+@order_ns.route('/number/<string:order_number>')
+class OrderByNumber(Resource):
+    @order_ns.doc('get_order_by_number')
+    @order_ns.marshal_with(order_response_model)
+    @order_ns.response(404, 'Order not found', error_model)
+    @handle_exceptions
+    def get(self, order_number):
+        """Get order by order number"""
+        order = order_service.get_order_by_number(order_number)
+        if not order:
+            return {'error': 'Order not found'}, 404
+        return order.to_dict()
+
+@order_ns.route('/customer/<string:customer_email>')
+class CustomerOrders(Resource):
+    @order_ns.doc('get_customer_orders')
+    @order_ns.marshal_list_with(order_response_model)
+    @handle_exceptions
+    def get(self, customer_email):
+        """Get orders for a specific customer"""
+        orders = order_service.get_customer_orders(customer_email)
+        return [order.to_dict() for order in orders]
+
+@order_ns.route('/status/<string:status>')
+class OrdersByStatus(Resource):
+    @order_ns.doc('get_orders_by_status')
+    @order_ns.marshal_list_with(order_response_model)
+    @handle_exceptions
+    def get(self, status):
+        """Get orders by status"""
+        try:
+            orders = order_service.get_orders_by_status(status)
+            return [order.to_dict() for order in orders]
+        except ValueError as e:
+            return {'error': f'Invalid status: {str(e)}'}, 400

@@ -1,0 +1,197 @@
+from flask import request
+from flask_restx import Namespace, Resource, fields
+from services.inventory_service import InventoryService
+from utils.decorators import handle_exceptions
+import logging
+
+logger = logging.getLogger(__name__)
+
+# Create namespace
+inventory_ns = Namespace('inventory', description='Inventory management operations')
+
+# Define models for Swagger documentation
+product_model = inventory_ns.model('Product', {
+    'id': fields.Integer(description='Product ID'),
+    'name': fields.String(description='Product name'),
+    'description': fields.String(description='Product description'),
+    'price': fields.Float(description='Product price'),
+    'sku': fields.String(description='Product SKU'),
+    'stock_quantity': fields.Integer(description='Available stock quantity'),
+    'created_at': fields.String(description='Creation timestamp'),
+    'updated_at': fields.String(description='Last update timestamp')
+})
+
+stock_update_model = inventory_ns.model('StockUpdate', {
+    'quantity': fields.Integer(required=True, description='New stock quantity')
+})
+
+availability_check_item = inventory_ns.model('AvailabilityCheckItem', {
+    'sku': fields.String(required=True, description='Product SKU'),
+    'quantity': fields.Integer(required=True, description='Requested quantity')
+})
+
+availability_check_model = inventory_ns.model('AvailabilityCheck', {
+    'items': fields.List(fields.Nested(availability_check_item), required=True, description='Items to check')
+})
+
+availability_result_model = inventory_ns.model('AvailabilityResult', {
+    'sku': fields.String(description='Product SKU'),
+    'available': fields.Boolean(description='Whether item is available'),
+    'reason': fields.String(description='Reason if not available'),
+    'requested_quantity': fields.Integer(description='Requested quantity'),
+    'available_quantity': fields.Integer(description='Available quantity')
+})
+
+inventory_transaction_model = inventory_ns.model('InventoryTransaction', {
+    'id': fields.Integer(description='Transaction ID'),
+    'product_id': fields.Integer(description='Product ID'),
+    'order_id': fields.Integer(description='Order ID'),
+    'transaction_type': fields.String(description='Transaction type'),
+    'quantity': fields.Integer(description='Quantity changed'),
+    'previous_stock': fields.Integer(description='Previous stock level'),
+    'new_stock': fields.Integer(description='New stock level'),
+    'created_at': fields.String(description='Transaction timestamp')
+})
+
+error_model = inventory_ns.model('Error', {
+    'error': fields.String(description='Error message'),
+    'details': fields.String(description='Error details')
+})
+
+# Initialize service
+inventory_service = InventoryService()
+
+@inventory_ns.route('/products')
+class ProductList(Resource):
+    @inventory_ns.doc('list_products')
+    @inventory_ns.marshal_list_with(product_model)
+    @handle_exceptions
+    def get(self):
+        """Get all products"""
+        products = inventory_service.get_all_products()
+        return [product.to_dict() for product in products]
+
+@inventory_ns.route('/products/<int:product_id>')
+class Product(Resource):
+    @inventory_ns.doc('get_product')
+    @inventory_ns.marshal_with(product_model)
+    @inventory_ns.response(404, 'Product not found', error_model)
+    @handle_exceptions
+    def get(self, product_id):
+        """Get product by ID"""
+        product = inventory_service.get_product(product_id)
+        if not product:
+            return {'error': 'Product not found'}, 404
+        return product.to_dict()
+
+@inventory_ns.route('/products/sku/<string:sku>')
+class ProductBySku(Resource):
+    @inventory_ns.doc('get_product_by_sku')
+    @inventory_ns.marshal_with(product_model)
+    @inventory_ns.response(404, 'Product not found', error_model)
+    @handle_exceptions
+    def get(self, sku):
+        """Get product by SKU"""
+        product = inventory_service.get_product_by_sku(sku)
+        if not product:
+            return {'error': 'Product not found'}, 404
+        return product.to_dict()
+
+@inventory_ns.route('/products/<int:product_id>/stock')
+class ProductStock(Resource):
+    @inventory_ns.doc('update_stock')
+    @inventory_ns.expect(stock_update_model)
+    @inventory_ns.marshal_with(product_model)
+    @inventory_ns.response(404, 'Product not found', error_model)
+    @inventory_ns.response(400, 'Invalid quantity', error_model)
+    @handle_exceptions
+    def put(self, product_id):
+        """Update product stock quantity"""
+        data = request.get_json()
+        
+        if 'quantity' not in data:
+            return {'error': 'Quantity is required'}, 400
+        
+        quantity = data['quantity']
+        if quantity < 0:
+            return {'error': 'Quantity cannot be negative'}, 400
+        
+        try:
+            product = inventory_service.update_stock(product_id, quantity)
+            return product.to_dict()
+        except ValueError as e:
+            return {'error': str(e)}, 404
+
+@inventory_ns.route('/check-availability')
+class AvailabilityCheck(Resource):
+    @inventory_ns.doc('check_availability')
+    @inventory_ns.expect(availability_check_model)
+    @inventory_ns.marshal_list_with(availability_result_model)
+    @inventory_ns.response(400, 'Invalid input', error_model)
+    @handle_exceptions
+    def post(self):
+        """Check product availability for given quantities"""
+        data = request.get_json()
+        
+        if 'items' not in data:
+            return {'error': 'Items list is required'}, 400
+        
+        if not data['items']:
+            return {'error': 'Items list cannot be empty'}, 400
+        
+        # Validate items
+        for item in data['items']:
+            if 'sku' not in item or 'quantity' not in item:
+                return {'error': 'Each item must have sku and quantity'}, 400
+            if item['quantity'] <= 0:
+                return {'error': 'Quantity must be positive'}, 400
+        
+        results = inventory_service.check_availability(data['items'])
+        return results
+
+@inventory_ns.route('/low-stock')
+class LowStockProducts(Resource):
+    @inventory_ns.doc('get_low_stock_products')
+    @inventory_ns.param('threshold', 'Stock threshold (default: 10)', type='int')
+    @inventory_ns.marshal_list_with(product_model)
+    @handle_exceptions
+    def get(self):
+        """Get products with low stock"""
+        threshold = request.args.get('threshold', 10, type=int)
+        products = inventory_service.get_low_stock_products(threshold)
+        return [product.to_dict() for product in products]
+
+@inventory_ns.route('/transactions')
+class InventoryTransactions(Resource):
+    @inventory_ns.doc('get_inventory_transactions')
+    @inventory_ns.param('order_id', 'Filter by order ID', type='int')
+    @inventory_ns.param('product_id', 'Filter by product ID', type='int')
+    @inventory_ns.marshal_list_with(inventory_transaction_model)
+    @handle_exceptions
+    def get(self):
+        """Get inventory transactions with optional filters"""
+        order_id = request.args.get('order_id', type=int)
+        product_id = request.args.get('product_id', type=int)
+        
+        transactions = inventory_service.get_inventory_transactions(order_id, product_id)
+        return [transaction.to_dict() for transaction in transactions]
+
+@inventory_ns.route('/transactions/order/<int:order_id>')
+class OrderInventoryTransactions(Resource):
+    @inventory_ns.doc('get_order_transactions')
+    @inventory_ns.marshal_list_with(inventory_transaction_model)
+    @handle_exceptions
+    def get(self, order_id):
+        """Get inventory transactions for a specific order"""
+        transactions = inventory_service.get_inventory_transactions(order_id=order_id)
+        return [transaction.to_dict() for transaction in transactions]
+
+@inventory_ns.route('/transactions/product/<int:product_id>')
+class ProductInventoryTransactions(Resource):
+    @inventory_ns.doc('get_product_transactions')
+    @inventory_ns.marshal_list_with(inventory_transaction_model)
+    @handle_exceptions
+    def get(self, product_id):
+        """Get inventory transactions for a specific product"""
+        transactions = inventory_service.get_inventory_transactions(product_id=product_id)
+        return [transaction.to_dict() for transaction in transactions]
