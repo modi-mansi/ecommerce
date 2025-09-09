@@ -14,9 +14,12 @@ async function apiRequest<T>(
   options: RequestInit = {}
 ): Promise<T> {
   const url = `${API_BASE}${endpoint}`;
+  const token = localStorage.getItem("auth_token");
+  
   const config: RequestInit = {
     headers: {
       "Content-Type": "application/json",
+      ...(token && { Authorization: `Bearer ${token}` }),
       ...options.headers,
     },
     ...options,
@@ -155,6 +158,38 @@ export const cartApi = {
 export const analyticsApi = {
   getMetrics: (): Promise<Metrics> =>
     apiRequest("/analytics/metrics"),
+};
+
+export const authApi = {
+  login: (username: string, password: string): Promise<{
+    user: any;
+    access_token: string;
+    message: string;
+  }> =>
+    apiRequest("/auth/login", {
+      method: "POST",
+      body: JSON.stringify({ username, password }),
+    }),
+
+  register: (userData: {
+    username: string;
+    email: string;
+    password: string;
+    firstName: string;
+    lastName: string;
+    role?: string;
+  }): Promise<{
+    user: any;
+    access_token: string;
+    message: string;
+  }> =>
+    apiRequest("/auth/register", {
+      method: "POST",
+      body: JSON.stringify(userData),
+    }),
+
+  getCurrentUser: (): Promise<{ user: any }> =>
+    apiRequest("/auth/me"),
 };
 
 export { ApiError };
