@@ -1,0 +1,1188 @@
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>E-Commerce Platform - Complete Admin & Customer Interface</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/antd/5.12.8/reset.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/antd/5.12.8/antd.min.js"></script>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+    tailwind.config = {
+        theme: {
+            extend: {
+                fontFamily: {
+                    'inter': ['Inter', 'sans-serif']
+                },
+                colors: {
+                    primary: {
+                        50: '#e6f7ff',
+                        100: '#bae7ff', 
+                        500: '#1890ff',
+                        600: '#096dd9',
+                        700: '#0050b3'
+                    },
+                    success: {
+                        50: '#f6ffed',
+                        500: '#52c41a',
+                        600: '#389e0d'
+                    },
+                    warning: {
+                        50: '#fffbe6',
+                        500: '#faad14',
+                        600: '#d48806'
+                    },
+                    error: {
+                        50: '#fff2f0',
+                        500: '#ff4d4f',
+                        600: '#cf1322'
+                    }
+                }
+            }
+        }
+    };
+    </script>
+    <style>
+        * {
+            font-family: 'Inter', sans-serif;
+        }
+        
+        .ant-layout-header {
+            background: #fff;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            padding: 0 24px;
+            position: fixed;
+            width: 100%;
+            z-index: 1000;
+            top: 0;
+        }
+        
+        .ant-layout-content {
+            margin-top: 64px;
+            min-height: calc(100vh - 64px);
+        }
+        
+        .product-card {
+            transition: all 0.3s ease;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        
+        .product-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+        }
+        
+        .cart-badge {
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            min-width: 20px;
+            height: 20px;
+            border-radius: 10px;
+            background: #ff4d4f;
+            color: white;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .status-pending { color: #faad14; }
+        .status-processing { color: #1890ff; }
+        .status-completed { color: #52c41a; }
+        .status-cancelled { color: #ff4d4f; }
+        
+        .dashboard-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 12px;
+        }
+        
+        .metric-card {
+            text-align: center;
+            padding: 24px;
+            border-radius: 8px;
+            background: white;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        .sidebar-nav {
+            background: #001529;
+            color: white;
+            height: 100vh;
+            position: fixed;
+            left: 0;
+            top: 64px;
+            width: 256px;
+            overflow-y: auto;
+        }
+        
+        .main-content {
+            margin-left: 256px;
+            padding: 24px;
+        }
+        
+        @media (max-width: 768px) {
+            .sidebar-nav {
+                transform: translateX(-100%);
+                transition: transform 0.3s ease;
+            }
+            
+            .sidebar-nav.open {
+                transform: translateX(0);
+            }
+            
+            .main-content {
+                margin-left: 0;
+            }
+        }
+        
+        .loading-spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #1890ff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .error-message {
+            background: #fff2f0;
+            border: 1px solid #ffccc7;
+            border-radius: 6px;
+            padding: 16px;
+            color: #cf1322;
+            margin: 16px 0;
+        }
+        
+        .success-message {
+            background: #f6ffed;
+            border: 1px solid #b7eb8f;
+            border-radius: 6px;
+            padding: 16px;
+            color: #389e0d;
+            margin: 16px 0;
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- @COMPONENT: Header [Fixed navigation with logo, cart, user menu] -->
+    <header class="ant-layout-header flex items-center justify-between">
+        <div class="flex items-center space-x-8">
+            <div class="text-2xl font-bold text-primary-600">ShopFlow</div>
+            <nav class="hidden md:flex space-x-6">
+                <a href="#products" class="text-gray-700 hover:text-primary-600 font-medium transition-colors">Products</a>
+                <a href="#orders" class="text-gray-700 hover:text-primary-600 font-medium transition-colors">Orders</a>
+                <a href="#admin" class="text-gray-700 hover:text-primary-600 font-medium transition-colors">Admin</a>
+            </nav>
+        </div>
+        
+        <div class="flex items-center space-x-4">
+            <!-- Search Bar -->
+            <div class="hidden lg:block">
+                <div class="relative">
+                    <input type="search" placeholder="Search products..." 
+                           class="w-80 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent">
+                    <svg class="absolute right-3 top-2.5 h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                    </svg>
+                </div>
+            </div>
+            
+            <!-- Cart Icon -->
+            <div class="relative cursor-pointer hover:text-primary-600 transition-colors">
+                <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4m0 0L7 13m0 0l-2.5 5M7 13l2.5 5m6 0a1 1 0 100-2 1 1 0 000 2zm-10 0a1 1 0 100-2 1 1 0 000 2z"></path>
+                </svg>
+                <span class="cart-badge" data-bind="cart.itemCount">3</span>
+            </div>
+            
+            <!-- User Menu -->
+            <div class="flex items-center space-x-2 cursor-pointer hover:text-primary-600 transition-colors">
+                <div class="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center">
+                    <span class="text-primary-600 font-medium text-sm" data-bind="user.initials">JD</span>
+                </div>
+                <span class="hidden md:block font-medium" data-bind="user.name">John Doe</span>
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                </svg>
+            </div>
+        </div>
+    </header>
+    <!-- @END_COMPONENT: Header -->
+
+    <div class="ant-layout-content">
+        <!-- @COMPONENT: ProductCatalog [Main product browsing interface] -->
+        <section id="products" class="py-8">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <!-- Filters and Search -->
+                <div class="bg-white rounded-lg shadow-sm p-6 mb-8">
+                    <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
+                        <div class="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4">
+                            <select class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent">
+                                <option>All Categories</option>
+                                <option>Electronics</option>
+                                <option>Clothing</option>
+                                <option>Home & Garden</option>
+                                <option>Sports</option>
+                            </select>
+                            
+                            <select class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent">
+                                <option>Price: Low to High</option>
+                                <option>Price: High to Low</option>
+                                <option>Name: A to Z</option>
+                                <option>Most Popular</option>
+                            </select>
+                            
+                            <div class="flex items-center space-x-2">
+                                <label class="text-sm font-medium text-gray-700">In Stock Only</label>
+                                <input type="checkbox" class="rounded border-gray-300 text-primary-600 focus:ring-primary-500">
+                            </div>
+                        </div>
+                        
+                        <div class="flex items-center space-x-2 text-sm text-gray-600">
+                            <span>Showing <strong data-bind="products.count">24</strong> of <strong data-bind="products.total">156</strong> products</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Product Grid -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                    <!-- @MAP: products.map(product => ( -->
+                    <div class="product-card bg-white rounded-lg shadow-sm overflow-hidden">
+                        <!-- Modern wireless headphones with noise cancellation -->
+                        <img src="https://images.unsplash.com/photo-1505740420928-5e560c06d30e?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&h=300" 
+                             alt="Wireless Headphones" class="w-full h-48 object-cover">
+                        
+                        <div class="p-4">
+                            <div class="flex justify-between items-start mb-2">
+                                <h3 class="font-semibold text-gray-900 line-clamp-2" data-bind="product.name">Premium Wireless Headphones</h3>
+                                <div class="flex items-center text-sm text-gray-500">
+                                    <svg class="h-4 w-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"></path>
+                                    </svg>
+                                    <span data-bind="product.rating">4.8</span>
+                                </div>
+                            </div>
+                            
+                            <p class="text-sm text-gray-600 mb-3 line-clamp-2" data-bind="product.description">
+                                High-quality wireless headphones with active noise cancellation and 30-hour battery life.
+                            </p>
+                            
+                            <div class="flex items-center justify-between mb-3">
+                                <div class="flex items-center space-x-2">
+                                    <span class="text-2xl font-bold text-gray-900" data-bind="product.price">$299.99</span>
+                                    <span class="text-sm text-gray-500 line-through" data-bind="product.originalPrice">$399.99</span>
+                                </div>
+                                <span class="text-xs text-success-600 bg-success-50 px-2 py-1 rounded-full">25% OFF</span>
+                            </div>
+                            
+                            <div class="flex items-center justify-between mb-4">
+                                <div class="flex items-center text-sm">
+                                    <div class="w-2 h-2 bg-success-500 rounded-full mr-2"></div>
+                                    <span class="text-gray-600">Stock: <strong data-bind="product.stock">15</strong></span>
+                                </div>
+                                <span class="text-xs text-gray-500" data-bind="product.sku">SKU: HP-001</span>
+                            </div>
+                            
+                            <button class="w-full bg-primary-600 text-white py-2 px-4 rounded-lg hover:bg-primary-700 transition-colors flex items-center justify-center space-x-2"
+                                    data-event="click:addToCart" data-implementation="Add product to cart and update badge">
+                                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4m0 0L7 13m0 0l-2.5 5M7 13l2.5 5m6 0a1 1 0 100-2 1 1 0 000 2zm-10 0a1 1 0 100-2 1 1 0 000 2z"></path>
+                                </svg>
+                                <span>Add to Cart</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="product-card bg-white rounded-lg shadow-sm overflow-hidden">
+                        <!-- Professional laptop computer for business use -->
+                        <img src="https://images.unsplash.com/photo-1496181133206-80ce9b88a853?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&h=300" 
+                             alt="Professional Laptop" class="w-full h-48 object-cover">
+                        
+                        <div class="p-4">
+                            <div class="flex justify-between items-start mb-2">
+                                <h3 class="font-semibold text-gray-900 line-clamp-2">Professional Laptop Pro</h3>
+                                <div class="flex items-center text-sm text-gray-500">
+                                    <svg class="h-4 w-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"></path>
+                                    </svg>
+                                    <span>4.9</span>
+                                </div>
+                            </div>
+                            
+                            <p class="text-sm text-gray-600 mb-3 line-clamp-2">
+                                High-performance laptop with 16GB RAM, 512GB SSD, and Intel i7 processor for professional work.
+                            </p>
+                            
+                            <div class="flex items-center justify-between mb-3">
+                                <div class="flex items-center space-x-2">
+                                    <span class="text-2xl font-bold text-gray-900">$1,299.99</span>
+                                </div>
+                                <span class="text-xs text-primary-600 bg-primary-50 px-2 py-1 rounded-full">BESTSELLER</span>
+                            </div>
+                            
+                            <div class="flex items-center justify-between mb-4">
+                                <div class="flex items-center text-sm">
+                                    <div class="w-2 h-2 bg-success-500 rounded-full mr-2"></div>
+                                    <span class="text-gray-600">Stock: <strong>8</strong></span>
+                                </div>
+                                <span class="text-xs text-gray-500">SKU: LP-002</span>
+                            </div>
+                            
+                            <button class="w-full bg-primary-600 text-white py-2 px-4 rounded-lg hover:bg-primary-700 transition-colors flex items-center justify-center space-x-2">
+                                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4m0 0L7 13m0 0l-2.5 5M7 13l2.5 5m6 0a1 1 0 100-2 1 1 0 000 2zm-10 0a1 1 0 100-2 1 1 0 000 2z"></path>
+                                </svg>
+                                <span>Add to Cart</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="product-card bg-white rounded-lg shadow-sm overflow-hidden">
+                        <!-- Stylish running shoes for athletes -->
+                        <img src="https://images.unsplash.com/photo-1542291026-7eec264c27ff?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&h=300" 
+                             alt="Running Shoes" class="w-full h-48 object-cover">
+                        
+                        <div class="p-4">
+                            <div class="flex justify-between items-start mb-2">
+                                <h3 class="font-semibold text-gray-900 line-clamp-2">Athletic Running Shoes</h3>
+                                <div class="flex items-center text-sm text-gray-500">
+                                    <svg class="h-4 w-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"></path>
+                                    </svg>
+                                    <span>4.7</span>
+                                </div>
+                            </div>
+                            
+                            <p class="text-sm text-gray-600 mb-3 line-clamp-2">
+                                Lightweight running shoes with advanced cushioning and breathable mesh upper.
+                            </p>
+                            
+                            <div class="flex items-center justify-between mb-3">
+                                <div class="flex items-center space-x-2">
+                                    <span class="text-2xl font-bold text-gray-900">$129.99</span>
+                                    <span class="text-sm text-gray-500 line-through">$159.99</span>
+                                </div>
+                                <span class="text-xs text-warning-600 bg-warning-50 px-2 py-1 rounded-full">LIMITED</span>
+                            </div>
+                            
+                            <div class="flex items-center justify-between mb-4">
+                                <div class="flex items-center text-sm">
+                                    <div class="w-2 h-2 bg-warning-500 rounded-full mr-2"></div>
+                                    <span class="text-gray-600">Stock: <strong>3</strong></span>
+                                </div>
+                                <span class="text-xs text-gray-500">SKU: SH-003</span>
+                            </div>
+                            
+                            <button class="w-full bg-primary-600 text-white py-2 px-4 rounded-lg hover:bg-primary-700 transition-colors flex items-center justify-center space-x-2">
+                                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4m0 0L7 13m0 0l-2.5 5M7 13l2.5 5m6 0a1 1 0 100-2 1 1 0 000 2zm-10 0a1 1 0 100-2 1 1 0 000 2z"></path>
+                                </svg>
+                                <span>Add to Cart</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="product-card bg-white rounded-lg shadow-sm overflow-hidden">
+                        <!-- Modern smartphone with advanced camera -->
+                        <img src="https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&h=300" 
+                             alt="Smartphone" class="w-full h-48 object-cover">
+                        
+                        <div class="p-4">
+                            <div class="flex justify-between items-start mb-2">
+                                <h3 class="font-semibold text-gray-900 line-clamp-2">Smartphone Pro Max</h3>
+                                <div class="flex items-center text-sm text-gray-500">
+                                    <svg class="h-4 w-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"></path>
+                                    </svg>
+                                    <span>4.6</span>
+                                </div>
+                            </div>
+                            
+                            <p class="text-sm text-gray-600 mb-3 line-clamp-2">
+                                Latest smartphone with advanced camera system, 5G connectivity, and all-day battery life.
+                            </p>
+                            
+                            <div class="flex items-center justify-between mb-3">
+                                <div class="flex items-center space-x-2">
+                                    <span class="text-2xl font-bold text-gray-900">$899.99</span>
+                                </div>
+                                <span class="text-xs text-success-600 bg-success-50 px-2 py-1 rounded-full">NEW</span>
+                            </div>
+                            
+                            <div class="flex items-center justify-between mb-4">
+                                <div class="flex items-center text-sm">
+                                    <div class="w-2 h-2 bg-error-500 rounded-full mr-2"></div>
+                                    <span class="text-gray-600">Stock: <strong>0</strong></span>
+                                </div>
+                                <span class="text-xs text-gray-500">SKU: SP-004</span>
+                            </div>
+                            
+                            <button class="w-full bg-gray-300 text-gray-500 py-2 px-4 rounded-lg cursor-not-allowed" disabled>
+                                <span>Out of Stock</span>
+                            </button>
+                        </div>
+                    </div>
+                    <!-- @END_MAP )) -->
+                </div>
+
+                <!-- Pagination -->
+                <div class="flex justify-center mt-12">
+                    <nav class="flex items-center space-x-1">
+                        <button class="px-3 py-2 text-gray-500 hover:text-gray-700">
+                            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+                            </svg>
+                        </button>
+                        <button class="px-3 py-2 bg-primary-600 text-white rounded">1</button>
+                        <button class="px-3 py-2 text-gray-700 hover:text-gray-900">2</button>
+                        <button class="px-3 py-2 text-gray-700 hover:text-gray-900">3</button>
+                        <span class="px-3 py-2 text-gray-500">...</span>
+                        <button class="px-3 py-2 text-gray-700 hover:text-gray-900">10</button>
+                        <button class="px-3 py-2 text-gray-500 hover:text-gray-700">
+                            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                            </svg>
+                        </button>
+                    </nav>
+                </div>
+            </div>
+        </section>
+        <!-- @END_COMPONENT: ProductCatalog -->
+
+        <!-- @COMPONENT: ShoppingCart [Cart management interface] -->
+        <section id="cart" class="py-8 bg-white hidden">
+            <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex items-center justify-between mb-8">
+                    <h1 class="text-3xl font-bold text-gray-900">Shopping Cart</h1>
+                    <span class="text-lg text-gray-600" data-bind="cart.itemCount">3 items</span>
+                </div>
+
+                <!-- Cart Items -->
+                <div class="bg-white rounded-lg shadow-sm overflow-hidden mb-8">
+                    <!-- @MAP: cartItems.map(item => ( -->
+                    <div class="flex items-center p-6 border-b border-gray-200">
+                        <!-- Modern wireless headphones product image -->
+                        <img src="https://images.unsplash.com/photo-1505740420928-5e560c06d30e?ixlib=rb-4.0.3&auto=format&fit=crop&w=100&h=100" 
+                             alt="Wireless Headphones" class="w-20 h-20 object-cover rounded-lg">
+                        
+                        <div class="flex-1 ml-6">
+                            <h3 class="text-lg font-semibold text-gray-900" data-bind="item.name">Premium Wireless Headphones</h3>
+                            <p class="text-gray-600 mt-1" data-bind="item.sku">SKU: HP-001</p>
+                            <div class="flex items-center mt-2">
+                                <span class="text-lg font-bold text-gray-900" data-bind="item.price">$299.99</span>
+                            </div>
+                        </div>
+                        
+                        <div class="flex items-center space-x-4">
+                            <div class="flex items-center border border-gray-300 rounded-lg">
+                                <button class="px-3 py-1 text-gray-600 hover:text-gray-800" data-event="click:decreaseQuantity">-</button>
+                                <span class="px-4 py-1 border-l border-r border-gray-300" data-bind="item.quantity">2</span>
+                                <button class="px-3 py-1 text-gray-600 hover:text-gray-800" data-event="click:increaseQuantity">+</button>
+                            </div>
+                            
+                            <div class="text-right">
+                                <div class="text-lg font-bold text-gray-900" data-bind="item.total">$599.98</div>
+                            </div>
+                            
+                            <button class="text-error-500 hover:text-error-700" data-event="click:removeFromCart">
+                                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                    <!-- @END_MAP )) -->
+                </div>
+
+                <!-- Order Summary -->
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    <div class="lg:col-span-2">
+                        <div class="bg-gray-50 rounded-lg p-6">
+                            <h3 class="text-lg font-semibold text-gray-900 mb-4">Shipping Information</h3>
+                            <form class="space-y-4">
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <input type="text" placeholder="First Name" class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent">
+                                    <input type="text" placeholder="Last Name" class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent">
+                                </div>
+                                <input type="email" placeholder="Email Address" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent">
+                                <textarea placeholder="Shipping Address" rows="3" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"></textarea>
+                            </form>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-gray-50 rounded-lg p-6">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-4">Order Summary</h3>
+                        <div class="space-y-3">
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Subtotal</span>
+                                <span class="font-medium" data-bind="cart.subtotal">$899.97</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Shipping</span>
+                                <span class="font-medium text-success-600">Free</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Tax</span>
+                                <span class="font-medium" data-bind="cart.tax">$89.99</span>
+                            </div>
+                            <div class="border-t border-gray-300 pt-3">
+                                <div class="flex justify-between">
+                                    <span class="text-lg font-semibold text-gray-900">Total</span>
+                                    <span class="text-lg font-bold text-gray-900" data-bind="cart.total">$989.96</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <button class="w-full mt-6 bg-primary-600 text-white py-3 px-4 rounded-lg hover:bg-primary-700 transition-colors font-semibold"
+                                data-event="click:proceedToCheckout" data-implementation="Process order creation via API">
+                            Proceed to Checkout
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+        <!-- @END_COMPONENT: ShoppingCart -->
+
+        <!-- @COMPONENT: OrderTracking [Customer order management] -->
+        <section id="orders" class="py-8 bg-gray-50 hidden">
+            <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex items-center justify-between mb-8">
+                    <h1 class="text-3xl font-bold text-gray-900">My Orders</h1>
+                    <div class="flex space-x-4">
+                        <select class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent">
+                            <option>All Orders</option>
+                            <option>Pending</option>
+                            <option>Processing</option>
+                            <option>Completed</option>
+                            <option>Cancelled</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Order List -->
+                <div class="space-y-6">
+                    <!-- @MAP: orders.map(order => ( -->
+                    <div class="bg-white rounded-lg shadow-sm overflow-hidden">
+                        <div class="p-6 border-b border-gray-200">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center space-x-4">
+                                    <h3 class="text-lg font-semibold text-gray-900" data-bind="order.number">Order #ORD-20241125-001</h3>
+                                    <span class="status-processing px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium" data-bind="order.status">Processing</span>
+                                </div>
+                                <div class="text-right">
+                                    <div class="text-lg font-bold text-gray-900" data-bind="order.total">$989.96</div>
+                                    <div class="text-sm text-gray-500" data-bind="order.date">Nov 25, 2024</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="p-6">
+                            <!-- Order Items -->
+                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+                                <!-- @MAP: order.items.map(item => ( -->
+                                <div class="flex items-center space-x-3">
+                                    <!-- Modern wireless headphones order item -->
+                                    <img src="https://images.unsplash.com/photo-1505740420928-5e560c06d30e?ixlib=rb-4.0.3&auto=format&fit=crop&w=60&h=60" 
+                                         alt="Wireless Headphones" class="w-12 h-12 object-cover rounded">
+                                    <div>
+                                        <div class="font-medium text-gray-900" data-bind="item.name">Premium Wireless Headphones</div>
+                                        <div class="text-sm text-gray-500">Qty: <span data-bind="item.quantity">2</span> × <span data-bind="item.price">$299.99</span></div>
+                                    </div>
+                                </div>
+                                <!-- @END_MAP )) -->
+                            </div>
+                            
+                            <!-- Order Progress -->
+                            <div class="mb-6">
+                                <div class="flex items-center space-x-4">
+                                    <div class="flex items-center">
+                                        <div class="w-8 h-8 bg-success-500 rounded-full flex items-center justify-center">
+                                            <svg class="h-5 w-5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+                                            </svg>
+                                        </div>
+                                        <span class="ml-2 text-sm font-medium text-gray-900">Order Placed</span>
+                                    </div>
+                                    
+                                    <div class="flex-1 h-1 bg-success-500"></div>
+                                    
+                                    <div class="flex items-center">
+                                        <div class="w-8 h-8 bg-primary-500 rounded-full flex items-center justify-center">
+                                            <div class="loading-spinner w-4 h-4 border-2 border-white border-t-transparent"></div>
+                                        </div>
+                                        <span class="ml-2 text-sm font-medium text-primary-600">Processing</span>
+                                    </div>
+                                    
+                                    <div class="flex-1 h-1 bg-gray-200"></div>
+                                    
+                                    <div class="flex items-center">
+                                        <div class="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center">
+                                            <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
+                                            </svg>
+                                        </div>
+                                        <span class="ml-2 text-sm text-gray-500">Shipped</span>
+                                    </div>
+                                    
+                                    <div class="flex-1 h-1 bg-gray-200"></div>
+                                    
+                                    <div class="flex items-center">
+                                        <div class="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center">
+                                            <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z"></path>
+                                            </svg>
+                                        </div>
+                                        <span class="ml-2 text-sm text-gray-500">Delivered</span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Order Actions -->
+                            <div class="flex items-center justify-between">
+                                <div class="flex space-x-3">
+                                    <button class="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                                            data-event="click:viewOrderDetails" data-implementation="Show detailed order information modal">
+                                        View Details
+                                    </button>
+                                    <button class="px-4 py-2 border border-error-300 text-error-600 rounded-lg hover:bg-error-50 transition-colors"
+                                            data-event="click:cancelOrder" data-implementation="Cancel order via API with confirmation">
+                                        Cancel Order
+                                    </button>
+                                </div>
+                                <div class="text-sm text-gray-500">
+                                    Expected delivery: <strong>Nov 30, 2024</strong>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- @END_MAP )) -->
+                </div>
+                
+                <!-- Pagination -->
+                <div class="flex justify-center mt-8">
+                    <nav class="flex items-center space-x-1">
+                        <button class="px-3 py-2 text-gray-500 hover:text-gray-700">Previous</button>
+                        <button class="px-3 py-2 bg-primary-600 text-white rounded">1</button>
+                        <button class="px-3 py-2 text-gray-700 hover:text-gray-900">2</button>
+                        <button class="px-3 py-2 text-gray-700 hover:text-gray-900">3</button>
+                        <button class="px-3 py-2 text-gray-500 hover:text-gray-700">Next</button>
+                    </nav>
+                </div>
+            </div>
+        </section>
+        <!-- @END_COMPONENT: OrderTracking -->
+
+        <!-- @COMPONENT: AdminDashboard [Administrative interface] -->
+        <section id="admin" class="py-8 hidden">
+            <div class="flex">
+                <!-- Sidebar Navigation -->
+                <div class="sidebar-nav">
+                    <div class="p-6">
+                        <h2 class="text-xl font-bold text-white mb-6">Admin Panel</h2>
+                        <nav class="space-y-2">
+                            <a href="#dashboard" class="flex items-center space-x-3 text-white hover:bg-gray-700 px-3 py-2 rounded-lg transition-colors">
+                                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z"></path>
+                                </svg>
+                                <span>Dashboard</span>
+                            </a>
+                            <a href="#orders-management" class="flex items-center space-x-3 text-white hover:bg-gray-700 px-3 py-2 rounded-lg transition-colors">
+                                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                </svg>
+                                <span>Orders</span>
+                            </a>
+                            <a href="#inventory-management" class="flex items-center space-x-3 text-white hover:bg-gray-700 px-3 py-2 rounded-lg transition-colors">
+                                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
+                                </svg>
+                                <span>Inventory</span>
+                            </a>
+                            <a href="#analytics" class="flex items-center space-x-3 text-white hover:bg-gray-700 px-3 py-2 rounded-lg transition-colors">
+                                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                                </svg>
+                                <span>Analytics</span>
+                            </a>
+                            <a href="#system-health" class="flex items-center space-x-3 text-white hover:bg-gray-700 px-3 py-2 rounded-lg transition-colors">
+                                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.031 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
+                                </svg>
+                                <span>System Health</span>
+                            </a>
+                        </nav>
+                    </div>
+                </div>
+
+                <!-- Main Content -->
+                <div class="main-content flex-1">
+                    <!-- Dashboard Overview -->
+                    <div class="mb-8">
+                        <h1 class="text-3xl font-bold text-gray-900 mb-6">Dashboard Overview</h1>
+                        
+                        <!-- Metrics Cards -->
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                            <div class="metric-card">
+                                <div class="text-3xl font-bold text-primary-600" data-bind="metrics.totalOrders">247</div>
+                                <div class="text-gray-600 mt-1">Total Orders</div>
+                                <div class="text-sm text-success-600 mt-2">+12% from last month</div>
+                            </div>
+                            
+                            <div class="metric-card">
+                                <div class="text-3xl font-bold text-success-600" data-bind="metrics.revenue">$48,392</div>
+                                <div class="text-gray-600 mt-1">Revenue</div>
+                                <div class="text-sm text-success-600 mt-2">+8% from last month</div>
+                            </div>
+                            
+                            <div class="metric-card">
+                                <div class="text-3xl font-bold text-warning-600" data-bind="metrics.lowStock">12</div>
+                                <div class="text-gray-600 mt-1">Low Stock Items</div>
+                                <div class="text-sm text-warning-600 mt-2">Requires attention</div>
+                            </div>
+                            
+                            <div class="metric-card">
+                                <div class="text-3xl font-bold text-primary-600" data-bind="metrics.customers">1,842</div>
+                                <div class="text-gray-600 mt-1">Total Customers</div>
+                                <div class="text-sm text-success-600 mt-2">+15% from last month</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Recent Orders -->
+                    <div class="bg-white rounded-lg shadow-sm mb-8">
+                        <div class="p-6 border-b border-gray-200">
+                            <div class="flex items-center justify-between">
+                                <h2 class="text-xl font-semibold text-gray-900">Recent Orders</h2>
+                                <button class="text-primary-600 hover:text-primary-700 font-medium" data-event="click:viewAllOrders">
+                                    View All Orders
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="overflow-x-auto">
+                            <table class="w-full">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Order</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Customer</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="bg-white divide-y divide-gray-200">
+                                    <!-- @MAP: recentOrders.map(order => ( -->
+                                    <tr>
+                                        <td class="px-6 py-4 whitespace-nowrap">
+                                            <div class="text-sm font-medium text-gray-900" data-bind="order.number">#ORD-20241125-001</div>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap">
+                                            <div class="text-sm font-medium text-gray-900" data-bind="order.customerName">John Doe</div>
+                                            <div class="text-sm text-gray-500" data-bind="order.customerEmail">john.doe@email.com</div>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap">
+                                            <span class="status-processing px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800" data-bind="order.status">
+                                                Processing
+                                            </span>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900" data-bind="order.total">$989.96</td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500" data-bind="order.date">Nov 25, 2024</td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                            <button class="text-primary-600 hover:text-primary-900 mr-3" data-event="click:editOrder">Edit</button>
+                                            <button class="text-error-600 hover:text-error-900" data-event="click:cancelOrder">Cancel</button>
+                                        </td>
+                                    </tr>
+                                    <!-- @END_MAP )) -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Inventory Management -->
+                    <div class="bg-white rounded-lg shadow-sm mb-8">
+                        <div class="p-6 border-b border-gray-200">
+                            <div class="flex items-center justify-between">
+                                <h2 class="text-xl font-semibold text-gray-900">Low Stock Alert</h2>
+                                <button class="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition-colors"
+                                        data-event="click:updateInventory" data-implementation="Open inventory management modal">
+                                    Update Inventory
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="overflow-x-auto">
+                            <table class="w-full">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Product</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">SKU</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Current Stock</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Min. Stock</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="bg-white divide-y divide-gray-200">
+                                    <!-- @MAP: lowStockProducts.map(product => ( -->
+                                    <tr>
+                                        <td class="px-6 py-4 whitespace-nowrap">
+                                            <div class="flex items-center">
+                                                <!-- Athletic running shoes inventory thumbnail -->
+                                                <img src="https://images.unsplash.com/photo-1542291026-7eec264c27ff?ixlib=rb-4.0.3&auto=format&fit=crop&w=40&h=40" 
+                                                     alt="Running Shoes" class="w-10 h-10 object-cover rounded">
+                                                <div class="ml-4">
+                                                    <div class="text-sm font-medium text-gray-900" data-bind="product.name">Athletic Running Shoes</div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900" data-bind="product.sku">SH-003</td>
+                                        <td class="px-6 py-4 whitespace-nowrap">
+                                            <span class="text-sm font-medium text-warning-600" data-bind="product.currentStock">3</span>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500" data-bind="product.minStock">10</td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                            <button class="bg-primary-600 text-white px-3 py-1 rounded text-sm hover:bg-primary-700 transition-colors"
+                                                    data-event="click:restockProduct" data-implementation="Open restock modal with current product">
+                                                Restock
+                                            </button>
+                                        </td>
+                                    </tr>
+                                    <!-- @END_MAP )) -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- System Health -->
+                    <div class="bg-white rounded-lg shadow-sm">
+                        <div class="p-6 border-b border-gray-200">
+                            <h2 class="text-xl font-semibold text-gray-900">System Health</h2>
+                        </div>
+                        
+                        <div class="p-6">
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                <div class="text-center">
+                                    <div class="w-16 h-16 bg-success-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                                        <svg class="h-8 w-8 text-success-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                        </svg>
+                                    </div>
+                                    <div class="text-lg font-semibold text-gray-900">Database</div>
+                                    <div class="text-sm text-success-600">Healthy</div>
+                                    <div class="text-xs text-gray-500 mt-1" data-bind="health.database.responseTime">Response: 15ms</div>
+                                </div>
+                                
+                                <div class="text-center">
+                                    <div class="w-16 h-16 bg-success-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                                        <svg class="h-8 w-8 text-success-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                        </svg>
+                                    </div>
+                                    <div class="text-lg font-semibold text-gray-900">Event Bus</div>
+                                    <div class="text-sm text-success-600">Running</div>
+                                    <div class="text-xs text-gray-500 mt-1" data-bind="health.eventBus.queueSize">Queue: 0 events</div>
+                                </div>
+                                
+                                <div class="text-center">
+                                    <div class="w-16 h-16 bg-success-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                                        <svg class="h-8 w-8 text-success-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                                        </svg>
+                                    </div>
+                                    <div class="text-lg font-semibold text-gray-900">API</div>
+                                    <div class="text-sm text-success-600">Operational</div>
+                                    <div class="text-xs text-gray-500 mt-1" data-bind="health.api.uptime">Uptime: 99.9%</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+        <!-- @END_COMPONENT: AdminDashboard -->
+    </div>
+
+    <!-- @COMPONENT: Modal [Order details and confirmations] -->
+    <div id="orderModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+        <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-90vh overflow-auto">
+            <div class="p-6 border-b border-gray-200">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-lg font-semibold text-gray-900">Order Details</h3>
+                    <button class="text-gray-400 hover:text-gray-600" onclick="document.getElementById('orderModal').classList.add('hidden')">
+                        <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="p-6">
+                <div class="space-y-6">
+                    <div>
+                        <h4 class="font-semibold text-gray-900 mb-2">Order Information</h4>
+                        <div class="grid grid-cols-2 gap-4 text-sm">
+                            <div><strong>Order Number:</strong> <span data-bind="selectedOrder.number">#ORD-20241125-001</span></div>
+                            <div><strong>Status:</strong> <span class="status-processing" data-bind="selectedOrder.status">Processing</span></div>
+                            <div><strong>Customer:</strong> <span data-bind="selectedOrder.customerName">John Doe</span></div>
+                            <div><strong>Email:</strong> <span data-bind="selectedOrder.customerEmail">john.doe@email.com</span></div>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <h4 class="font-semibold text-gray-900 mb-2">Shipping Address</h4>
+                        <p class="text-sm text-gray-600" data-bind="selectedOrder.shippingAddress">
+                            123 Main Street<br>
+                            San Francisco, CA 94105<br>
+                            United States
+                        </p>
+                    </div>
+                    
+                    <div>
+                        <h4 class="font-semibold text-gray-900 mb-2">Order Items</h4>
+                        <div class="space-y-3">
+                            <!-- @MAP: selectedOrder.items.map(item => ( -->
+                            <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                                <div class="flex items-center space-x-3">
+                                    <!-- Modern wireless headphones order item detail -->
+                                    <img src="https://images.unsplash.com/photo-1505740420928-5e560c06d30e?ixlib=rb-4.0.3&auto=format&fit=crop&w=50&h=50" 
+                                         alt="Wireless Headphones" class="w-12 h-12 object-cover rounded">
+                                    <div>
+                                        <div class="font-medium text-gray-900" data-bind="item.name">Premium Wireless Headphones</div>
+                                        <div class="text-sm text-gray-500">SKU: <span data-bind="item.sku">HP-001</span></div>
+                                    </div>
+                                </div>
+                                <div class="text-right">
+                                    <div class="font-medium text-gray-900"><span data-bind="item.quantity">2</span> × <span data-bind="item.price">$299.99</span></div>
+                                    <div class="text-sm text-gray-500">Total: <span data-bind="item.total">$599.98</span></div>
+                                </div>
+                            </div>
+                            <!-- @END_MAP )) -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="p-6 border-t border-gray-200">
+                <div class="flex items-center justify-between">
+                    <div class="text-lg font-semibold text-gray-900">
+                        Total: <span data-bind="selectedOrder.total">$989.96</span>
+                    </div>
+                    <div class="flex space-x-3">
+                        <button class="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                                onclick="document.getElementById('orderModal').classList.add('hidden')">
+                            Close
+                        </button>
+                        <button class="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+                                data-event="click:updateOrderStatus" data-implementation="Update order status via API">
+                            Update Status
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- @END_COMPONENT: Modal -->
+
+    <!-- @COMPONENT: Toast [Success and error notifications] -->
+    <div id="toastContainer" class="fixed top-20 right-4 space-y-2 z-50">
+        <!-- Success Toast -->
+        <div class="success-message hidden" id="successToast">
+            <div class="flex items-center">
+                <svg class="h-5 w-5 text-success-600 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+                </svg>
+                <span data-bind="toast.message">Operation completed successfully!</span>
+            </div>
+        </div>
+        
+        <!-- Error Toast -->
+        <div class="error-message hidden" id="errorToast">
+            <div class="flex items-center">
+                <svg class="h-5 w-5 text-error-600 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+                </svg>
+                <span data-bind="toast.error">An error occurred. Please try again.</span>
+            </div>
+        </div>
+    </div>
+    <!-- @END_COMPONENT: Toast -->
+
+    <script>
+    (function() {
+        // @STATE: currentView:string = 'products'
+        // @STATE: cartItems:array = []
+        // @STATE: isLoading:boolean = false
+        // @STATE: user:object = {}
+        
+        // Navigation handling
+        const navLinks = document.querySelectorAll('nav a');
+        const sections = document.querySelectorAll('section');
+        
+        // TODO: Implement React Router for proper SPA navigation
+        function showSection(targetId) {
+            sections.forEach(section => {
+                section.classList.add('hidden');
+            });
+            
+            const targetSection = document.querySelector(targetId);
+            if (targetSection) {
+                targetSection.classList.remove('hidden');
+            }
+        }
+        
+        navLinks.forEach(link => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                const targetId = link.getAttribute('href');
+                showSection(targetId);
+                
+                // Update active nav state
+                navLinks.forEach(l => l.classList.remove('text-primary-600'));
+                link.classList.add('text-primary-600');
+            });
+        });
+        
+        // Cart functionality
+        // TODO: Implement Redux or Context for state management
+        function updateCartBadge(count) {
+            const badge = document.querySelector('.cart-badge');
+            if (badge) {
+                badge.textContent = count;
+            }
+        }
+        
+        // Add to cart handlers
+        document.querySelectorAll('[data-event="click:addToCart"]').forEach(button => {
+            button.addEventListener('click', function() {
+                // TODO: Implement add to cart logic with API integration
+                const productCard = this.closest('.product-card');
+                if (productCard) {
+                    const productName = productCard.querySelector('[data-bind="product.name"]').textContent;
+                    showToast(`${productName} added to cart!`, 'success');
+                    
+                    // Simulate cart count update
+                    const currentCount = parseInt(document.querySelector('.cart-badge').textContent) || 0;
+                    updateCartBadge(currentCount + 1);
+                }
+            });
+        });
+        
+        // Modal handling
+        function showModal(modalId) {
+            const modal = document.getElementById(modalId);
+            if (modal) {
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+            }
+        }
+        
+        function hideModal(modalId) {
+            const modal = document.getElementById(modalId);
+            if (modal) {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+            }
+        }
+        
+        // Order details modal
+        document.querySelectorAll('[data-event="click:viewOrderDetails"]').forEach(button => {
+            button.addEventListener('click', function() {
+                // TODO: Fetch order details from API
+                showModal('orderModal');
+            });
+        });
+        
+        // Toast notifications
+        function showToast(message, type = 'success') {
+            const toastId = type === 'success' ? 'successToast' : 'errorToast';
+            const toast = document.getElementById(toastId);
+            
+            if (toast) {
+                const messageElement = toast.querySelector('[data-bind="toast.message"], [data-bind="toast.error"]');
+                if (messageElement) {
+                    messageElement.textContent = message;
+                }
+                
+                toast.classList.remove('hidden');
+                
+                // Auto-hide after 3 seconds
+                setTimeout(() => {
+                    toast.classList.add('hidden');
+                }, 3000);
+            }
+        }
+        
+        // API integration helpers
+        // TODO: Implement proper API service layer
+        class ApiService {
+            static async get(endpoint) {
+                try {
+                    const response = await fetch(`/api${endpoint}`);
+                    if (!response.ok) throw new Error('API request failed');
+                    return await response.json();
+                } catch (error) {
+                    showToast('Failed to fetch data', 'error');
+                    throw error;
+                }
+            }
+            
+            static async post(endpoint, data) {
+                try {
+                    const response = await fetch(`/api${endpoint}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(data)
+                    });
+                    if (!response.ok) throw new Error('API request failed');
+                    return await response.json();
+                } catch (error) {
+                    showToast('Failed to submit data', 'error');
+                    throw error;
+                }
+            }
+        }
+        
+        // Initialize mobile responsive menu
+        const mobileMenuToggle = document.createElement('button');
+        mobileMenuToggle.innerHTML = `
+            <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+            </svg>
+        `;
+        mobileMenuToggle.className = 'md:hidden text-gray-700 hover:text-primary-600';
+        
+        // Add mobile menu toggle to header
+        const header = document.querySelector('.ant-layout-header');
+        if (header) {
+            header.querySelector('.flex').appendChild(mobileMenuToggle);
+        }
+        
+        // Initialize default view
+        showSection('#products');
+        
+        // TODO: Load initial data from APIs
+        // ApiService.get('/inventory/products').then(products => {
+        //     // Update product grid with real data
+        // });
+        
+        // TODO: Load user session data
+        // ApiService.get('/auth/me').then(user => {
+        //     // Update user information in header
+        // });
+        
+        console.log('E-commerce frontend initialized successfully');
+    })();
+    </script>
+</body>
+</html>
